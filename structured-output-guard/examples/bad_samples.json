@@ -1,0 +1,74 @@
+[
+  {
+    "id": "R1a-外面裹了话，仍能截出来",
+    "expected_rules": [],
+    "note": "规则 1 的正常路径：截取成功，不该报任何问题",
+    "raw": "好的，我看了下这个单子：\n{\"category\":\"billing\",\"priority\":\"high\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}\n以上，请确认。"
+  },
+  {
+    "id": "R1b-整段不是 JSON",
+    "expected_rules": [1],
+    "note": "不可恢复的解析失败：全部落保守值 + 需要人工（没开追问分支时走这条）",
+    "raw": "这个工单我处理不了，需要你补充订单号。"
+  },
+  {
+    "id": "R2a-金额是带单位的字符串",
+    "expected_rules": [2],
+    "note": "能归一就归一：\"1,234.5 元\" → 1234.5，属于格式修正",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":\"1,234.5 元\",\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R2b-金额越界",
+    "expected_rules": [2],
+    "note": "越界属于校验失败：该字段落空 + 记一笔 + 需要人工",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":99999999,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R2c-枚举字段大小写差异",
+    "expected_rules": [2],
+    "note": "只有大小写差异：算格式修正，不走枚举收敛、也不要人工",
+    "raw": "{\"category\":\"billing\",\"priority\":\"High\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R2d-引用型：格式对但查不到",
+    "expected_rules": [2],
+    "note": "第四类字段（引用型）：16 位数字格式没错，但系统里查不到 → 一样不合法",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"9999999999999999\"}"
+  },
+  {
+    "id": "R2e-引用型：格式就不对",
+    "expected_rules": [2],
+    "note": "引用型：先卡格式，再卡存在性",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"abc-123\"}"
+  },
+  {
+    "id": "R3-枚举外的值",
+    "expected_rules": [3],
+    "note": "语义上不认识：落到保守值，属于业务降级",
+    "raw": "{\"category\":\"想退款\",\"priority\":\"normal\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R4a-允许留空的字段缺失",
+    "expected_rules": [],
+    "note": "reason 允许留空：留空且不报问题（不许补占位符）",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":234.5,\"needs_human\":\"no\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R4b-必须非空的字段缺失",
+    "expected_rules": [4],
+    "note": "必须非空却缺失：补保守值并标记人工",
+    "raw": "{\"category\":\"billing\",\"priority\":\"normal\",\"amount\":234.5,\"reason\":\"重复扣款\",\"action\":\"reply_only\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R6-不可逆动作遇上需要人工",
+    "expected_rules": [6],
+    "note": "要人工 + 不可逆动作 → 降级为可逆动作",
+    "raw": "{\"category\":\"billing\",\"priority\":\"high\",\"amount\":234.5,\"reason\":\"重复扣款\",\"needs_human\":\"yes\",\"action\":\"refund_irreversible\",\"order_id\":\"2026101700012345\"}"
+  },
+  {
+    "id": "R7-组合：非法枚举 + 缺字段 + 不可逆动作",
+    "expected_rules": [3, 4],
+    "note": "用来验规则叠加与顺序；动作降级是它俩的后果，不算根因",
+    "raw": "{\"category\":\"退款\",\"priority\":\"normal\",\"amount\":234.5,\"reason\":\"重复扣款\",\"action\":\"refund_irreversible\",\"order_id\":\"2026101700012345\"}"
+  }
+]
